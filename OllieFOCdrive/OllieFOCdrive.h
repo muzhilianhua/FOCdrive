@@ -8,6 +8,7 @@
 
 typedef struct
 {
+  // 串口通信相关
   unsigned char rxbuf[30];//接收数据的缓冲区
   unsigned char txbuf[30];
   unsigned char recstatu;//表示是否处于一个正在接收数据包的状态
