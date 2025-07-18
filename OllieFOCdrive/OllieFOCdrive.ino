@@ -41,44 +41,44 @@ int RobotTumble = 0;        //机器摔倒
 
 /**********************************************************************************************/
 // 新增串口控制相关变量  尝试加一下串口控制
-  float serialCH1 = 1500;  // 默认中位值
-  float serialCH2 = 1500;
-  float serialCH3 = 1500;
-  float serialCH4 = 1500;
-  bool newSerialData = false;  // 新数据标志
+float serialCH1 = 1500;  // 默认中位值
+float serialCH2 = 1500;
+float serialCH3 = 1500;
+float serialCH4 = 1500;
+bool newSerialData = false;  // 新数据标志
 
-  bool serialControlActive = false;
-  unsigned long lastSerialTime = 0;  // 最后一次串口命令时间
-  const int SERIAL_TIMEOUT = 300;  // 串口超时时间(ms)
+bool serialControlActive = false;
+unsigned long lastSerialTime = 0;  // 最后一次串口命令时间
+const int SERIAL_TIMEOUT = 300;  // 串口超时时间(ms)
 
-  bool remoteControlActive = true;   // 遥控器控制激活标志
+bool remoteControlActive = true;   // 遥控器控制激活标志
 
-  //定义滤波器结构体全局变量
-  biquadFilter_t SerialFilterLPF[4]; // 4个通道的滤波器
-  float serialLegLength_f = 0.06f;   // 滤波后的腿长
-  float serialBodyRoll_f = 0;        // 滤波后的横滚
-  float serialMovementSpeed_f = 0;   // 滤波后的移动速度
-  float serialBodyTurn_f = 0;        // 滤波后的转向
+//定义滤波器结构体全局变量
+biquadFilter_t SerialFilterLPF[4]; // 4个通道的滤波器
+float serialLegLength_f = 0.06f;   // 滤波后的腿长
+float serialBodyRoll_f = 0;        // 滤波后的横滚
+float serialMovementSpeed_f = 0;   // 滤波后的移动速度
+float serialBodyTurn_f = 0;        // 滤波后的转向
 
-  // 在全局变量区域添加
-  struct SerialCommandCache {
-      float legLength = 0.06f;
-      float bodyRoll = 0;
-      float movementSpeed = 0;
-      float bodyTurn = 0;
-      bool updated = false;
-  };
+// 在全局变量区域添加
+struct SerialCommandCache {
+    float legLength = 0.06f;
+    float bodyRoll = 0;
+    float movementSpeed = 0;
+    float bodyTurn = 0;
+    bool updated = false;
+};
 
-  SerialCommandCache serialRawCache;  // 原始值缓存
-  SerialCommandCache serialFiltered;  // 滤波后值
-  unsigned long lastSerialUpdate = 0; // 最后更新时间
+SerialCommandCache serialRawCache;  // 原始值缓存
+SerialCommandCache serialFiltered;  // 滤波后值
+unsigned long lastSerialUpdate = 0; // 最后更新时间
 
-  const unsigned long SERIAL_TIMEOUT_MS = 300; // 300ms超时时间
-  unsigned long lastSerialCommandTime = 0;     // 最后收到串口指令的时间
+const unsigned long SERIAL_TIMEOUT_MS = 300; // 300ms超时时间
+unsigned long lastSerialCommandTime = 0;     // 最后收到串口指令的时间
 
-  //串口调试print
-  unsigned long lastPrintTime = 0;
-  const unsigned long PRINT_INTERVAL = 1000; // 1秒打印间隔
+//串口调试print
+unsigned long lastPrintTime = 0;
+const unsigned long PRINT_INTERVAL = 1000; // 1秒打印间隔
 
 /*************************************************************************************/
 
@@ -205,6 +205,7 @@ const int CUSTOM_SERVO_2_PIN = 12;
 const int CUSTOM_SERVO_3_PIN = 21;
 const int CUSTOM_SERVO_4_PIN = 14;
 
+//零偏零偏
 void zeroBias_servo1(char *cmd) {
   command.scalar(&zeroBias.servo1, cmd);
 }
@@ -225,8 +226,8 @@ ServoControl servoControl(CUSTOM_SERVO_1_PIN, CUSTOM_SERVO_2_PIN, CUSTOM_SERVO_3
 
 //遥控器
 FUTABA_SBUS sBus;
-float sbuschx[8] = { 0 }; //遥控器通道数据
-int sbus_dt_ms = 0;   //sbus采样间隔
+float sbuschx[8] = { 0 };
+int sbus_dt_ms = 0;
 int sbus_swa = 0;
 int sbus_swb = 0;
 int sbus_swc = 0;
@@ -247,11 +248,14 @@ float sbus_vrbf = 0;
 
 // 创建 PID 控制器实例
 float Select = 0;             //选择要打印的数据
-float CalibrationSelect = 0;  //保存校准数据0：校准结束  1：校准陀螺仪 2：校准欧拉角 3：校准舵机
+
+// 零偏等校准
+float CalibrationSelect = 3;  //保存校准数据0：校准结束  1：校准陀螺仪 2：校准欧拉角 3：校准舵机
 
 float PidParameterTuning = 0;  //0：禁止调参 1：使能调参
 
-PIDController AnglePid(11, 200, 0.2, 0, 0.1);          //4 22 0.08   (Kp, Ki, Kd ,ramp ,limit)
+/*PIDPIDPID*/
+PIDController AnglePid(8, 200, 0.2, 0, 0.1);          //4 22 0.08   (Kp, Ki, Kd ,ramp ,limit)
 PIDController SpeedPid(0.1, 0.1, 0, 0, 50);     //
 PIDController YawPid(11, 33, 0, 0, 0);          //
 PIDController RollPid(0.06, 1.5, 0.003, 0, 2);  //
@@ -426,7 +430,7 @@ void motor_init(void);
 
 void command_init(void);
 
-void command_init(void) { //串口命令定义
+void command_init(void) {
   // subscribe motor to the commander
   command.add('T', doMotion1, "motion1 control");  //设置电机目标值
   command.add('M', doMotor1, "motor1");
@@ -778,6 +782,8 @@ void Send_Serial1(void) {
 }
 
 
+
+
 void Read_Serial1(void)  //读串口1数据
 {
 
@@ -996,14 +1002,14 @@ float mapf(long x, long in_min, long in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / divisor + out_min;
 }
 
-void RXsbus() { //sbus接收处理函数
+void RXsbus() {
 
   if (!remoteControlActive) return;  // 串口控制激活时跳过遥控器处理(这段是自己加的)
 
   static unsigned long now_ms = millis();
 
   sBus.FeedLine();
-  if (sBus.toChannels == 1) { //有新的一帧数据可用
+  if (sBus.toChannels == 1) {
     sbus_dt_ms = millis() - now_ms;
     now_ms = millis();
     sBus.toChannels = 0;
@@ -2204,6 +2210,8 @@ float BodyPitchingCorrect(float x)  //俯仰角校正
 }
 
 
+
+
 void PIDcontroller_angle(float dt) {
   //速度环
   Speed_Pid.Kp = SpeedPid.P;
@@ -2263,10 +2271,10 @@ void PidParameter(void) {
     SpeedPid.P = 0.1;
     SpeedPid.I = 0.1;
     SpeedPid.D = 0;
-    SpeedPid.limit = 50;  //积分限幅
+    SpeedPid.limit = 10;  //积分限幅
 
     //平衡环
-    AnglePid.P = 11;
+    AnglePid.P = 8;
     AnglePid.I = 200;
     AnglePid.D = 0.2;
     AnglePid.limit = 0.1;  //积分限幅
@@ -2476,6 +2484,7 @@ void PIDcontroller_posture(float dt) {
 
 
 
+
 void RemoteControlFiltering(void)  //遥控器滤波
 {
   static int enableDFilter_last = (int)enableDFilter;
@@ -2559,6 +2568,8 @@ void Robot_Tumble(void) {
     BodyPitching_f = 0;
   }
 }
+
+
 
 
 
@@ -2802,6 +2813,7 @@ void MotorOperatingMode(void)  //设置电机为速度模式与四轮足功能�
 }
 
 
+
 void PidParameter4wheel(void) {
 
   //横滚角
@@ -2810,7 +2822,7 @@ void PidParameter4wheel(void) {
   RollPid.D = 0.003;
   RollPid.limit = 4.4;  //积分限幅
 
-  //俯仰角角
+  //俯仰角
   AnglePid.P = 0.08;
   AnglePid.I = 1;
   AnglePid.D = 0.005;
@@ -2828,6 +2840,7 @@ void PidParameter4wheel(void) {
   TouchYPid.D = 0.11;
   TouchYPid.limit = 0;  //积分限幅
 }
+
 
 
 void PIDcontroller_posture_4wheel(float dt) {
@@ -3012,7 +3025,7 @@ void voltage_Indicator_Light(void)  //电压指示灯
   }
 
   if (Voltage <= 7.4)
-    LED_dt = 20;     //20ms闪一次
+    LED_dt = 20;
   else
     LED_dt = 100;
 }
@@ -3191,7 +3204,7 @@ void servo_task(void)  //舵机任务
 // 2. 修改handleSerialCommands函数
 void handleSerialCommands() {
   static String inputString;
-  while (Serial.available() > 0) { //以单个字符为单位读取串口数据
+  while (Serial.available() > 0) {
     char inChar = Serial.read();
 
     // 调试输出（可保留）
@@ -3200,7 +3213,7 @@ void handleSerialCommands() {
 /*********/
     SwitchingPattern == 0;
 /*********/
-    if (inChar == '\n') { // 如果接收到换行符，表示命令结束
+    if (inChar == '\n') {
       Serial.print("Full command: ");
       Serial.println(inputString);
 
@@ -3417,7 +3430,6 @@ void updateSerialFilters(float dt) {
         Serial.println(BodyTurn, 4);
     }
 }
-
 void printControlValues() {
   Serial.print("运动控制值 | ");
   
@@ -3484,7 +3496,7 @@ void setup() {
   }
 
   // 进行陀螺仪校准
-  //calibrateGyro();
+  calibrateGyro();
 
   //遥控器
   if (MasterSlaveSelection == 1)  //主机使用
@@ -3535,7 +3547,7 @@ void loop() {
     ReadTouchDat();
     
   time_dt = (now_us - now_us1) / 1000000.0f;
-  if (time_dt >= 0.005f)  //执行间隔5ms
+  if (time_dt >= 0.005f)
   {
     // /****更新串口滤波器****/
     // if (serialControlActive) {
@@ -3617,6 +3629,8 @@ void loop() {
     //   lastPrintTime = millis();
     // }
     now_us1 = now_us;
+
+    
   }
   // if (serialControlActive && (millis() - lastSerialTime > 500)) {
       
