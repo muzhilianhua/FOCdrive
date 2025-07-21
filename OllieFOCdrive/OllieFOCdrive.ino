@@ -136,8 +136,8 @@ const float accelRange = 8.0;  // 单位：g
 // 陀螺仪量程（这里假设为 ±2000°/s）
 const float gyroRange = 2000.0;  // 单位：°/
 attitude_t attitude;
-float roll_ok;   //
-float pitch_ok;  //
+float roll_ok;   //当前横滚角
+float pitch_ok;  //当前俯仰角
 
 zeroBias_t zeroBias;  //零点偏移
 unsigned long timestamp_prev = 0;
@@ -998,17 +998,23 @@ float mapf(long x, long in_min, long in_max, float out_min, float out_max) {
 
 void RXsbus() { //sbus接收处理函数
 
-  if (!remoteControlActive) return;  // 串口控制激活时跳过遥控器处理(这段是自己加的)
+  //if (!remoteControlActive) return;  // 串口控制激活时跳过遥控器处理(这段是自己加的)
 
   static unsigned long now_ms = millis();
 
   sBus.FeedLine();
   if (sBus.toChannels == 1) { //有新的一帧数据可用
+    serialControlActive = false;  // 串口控制禁用
     sbus_dt_ms = millis() - now_ms;
     now_ms = millis();
     sBus.toChannels = 0;
     sBus.UpdateChannels();
     sBus.toChannels = 0;
+
+    if(!sBus.Failsafe() == 0x00){
+      serialControlActive = true;  // 串口控制激活
+      return;  // 如果遥控器进入失控状态，直接返回
+    }
 
     MovementSpeed = mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -15, 15);
     BodyTurn = -mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -11, 11);
@@ -1075,6 +1081,8 @@ void RXsbus() { //sbus接收处理函数
     //   Serial.print(" Voltage:");
     //   Serial.println(Voltage, 5);
     // }
+  } else { //无可用数据
+    serialControlActive = true;  // 串口控制激活
   }
 }
 
@@ -3190,6 +3198,8 @@ void servo_task(void)  //舵机任务
 //解释和应用串口数据
 // 2. 修改handleSerialCommands函数
 void handleSerialCommands() {
+  if (!serialControlActive) return;
+
   static String inputString;
   while (Serial.available() > 0) { //以单个字符为单位读取串口数据
     char inChar = Serial.read();
