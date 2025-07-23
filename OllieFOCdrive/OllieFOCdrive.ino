@@ -2267,7 +2267,7 @@ void PidParameter(void) {
 
     //速度环
     SpeedPid.P = 0.1;
-    SpeedPid.I = 0.1;
+    SpeedPid.I = 0.04;
     SpeedPid.D = 0;
     SpeedPid.limit = 50;  //积分限幅
 
@@ -2287,7 +2287,7 @@ void PidParameter(void) {
 
     //速度环
     SpeedPid.P = 0.1;
-    SpeedPid.I = 0.1;
+    SpeedPid.I = 0.04;
     SpeedPid.D = 0;
     SpeedPid.limit = 50;  //积分限幅
 
@@ -2299,7 +2299,7 @@ void PidParameter(void) {
   }
 
   YawPid.P = 11;
-  YawPid.I = 33;
+  YawPid.I = 100;
   YawPid.D = 0;
   YawPid.limit = 0;
   
