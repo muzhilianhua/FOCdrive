@@ -616,7 +616,7 @@ void motor_init(void) {
   motor2.PID_current_q.I = 222;
   motor2.PID_current_q.D = 0.0;
   motor2.PID_current_q.output_ramp = 11111;
-  motor2.PID_current_q.limit = 5.0;
+  motor2.PID_current_q.limit = 8.4;
   // Low pass filtering time constant
   motor2.LPF_current_q.Tf = 0.01;
   // current d loop PID
@@ -1081,8 +1081,6 @@ void RXsbus() { //sbus接收处理函数
     //   Serial.print(" Voltage:");
     //   Serial.println(Voltage, 5);
     // }
-  } else { //无可用数据
-    serialControlActive = true;  // 串口控制激活
   }
 }
 
@@ -2212,7 +2210,7 @@ float BodyPitchingCorrect(float x)  //俯仰角校正
 }
 
 
-void PIDcontroller_angle(float dt) {
+void PIDcontroller_angle(float dt) { //该函数没有被调用
   //速度环
   Speed_Pid.Kp = SpeedPid.P;
   Speed_Pid.Ki = SpeedPid.I;
@@ -2288,15 +2286,15 @@ void PidParameter(void) {
     RollPid.limit = 2;  //积分限幅
 
     //速度环
-    SpeedPid.P = 0.12;
-    SpeedPid.I = 0.12;
+    SpeedPid.P = 0.1;
+    SpeedPid.I = 0.1;
     SpeedPid.D = 0;
     SpeedPid.limit = 50;  //积分限幅
 
     //平衡环
-    AnglePid.P = 9;
-    AnglePid.I = 222;
-    AnglePid.D = 0.11;
+    AnglePid.P = 11;
+    AnglePid.I = 200;
+    AnglePid.D = 0.2;
     AnglePid.limit = 0.1;  //积分限幅
   }
 
@@ -2304,7 +2302,7 @@ void PidParameter(void) {
   YawPid.I = 33;
   YawPid.D = 0;
   YawPid.limit = 0;
-
+  
   //触摸屏
   TouchXPid.P = 0.2;
   TouchXPid.I = 0;
@@ -2456,8 +2454,8 @@ void PIDcontroller_posture(float dt) {
   Yaw_Pid.iLimit = YawPid.limit;
   if (sbus_swc != 1)  //锁定航向角
   {
-    Yaw_Pid.Ki = 0;
-    Yaw_Pid.integral = 0;
+    //Yaw_Pid.Ki = 0;
+    //Yaw_Pid.integral = 0;
   }
 
   float yawError = attitude.gyro.z - BodyTurn;  //测量值减去目标值
@@ -2481,7 +2479,6 @@ void PIDcontroller_posture(float dt) {
   motor1.target = target1;
   motor2.target = target2;
 }
-
 
 
 void RemoteControlFiltering(void)  //遥控器滤波
