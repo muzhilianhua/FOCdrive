@@ -28,7 +28,7 @@ Commander command = Commander(Serial);
 //机体
 #define Thigh 0.035f        // 大腿长度m
 #define Shank 0.072f        // 小腿长度m
-float TargetLegLength = 0;  //目标腿长
+float TargetLegLength = 0;  //目标腿长   用于串口通讯调整腿长
 float LegLength = 0.06f;    //腿长
 float BarycenterX = 0;      //质心X
 float BodyPitching = 0;     //俯仰
@@ -47,11 +47,11 @@ int RobotTumble = 0;        //机器摔倒
   float serialCH4 = 1500;
   bool newSerialData = false;  // 新数据标志
 
-  bool serialControlActive = false;
+  bool serialControlActive = true;
   unsigned long lastSerialTime = 0;  // 最后一次串口命令时间
   const int SERIAL_TIMEOUT = 300;  // 串口超时时间(ms)
 
-  bool remoteControlActive = true;   // 遥控器控制激活标志
+  bool remoteControlActive = false;   // 遥控器控制激活标志
 
   //定义滤波器结构体全局变量
   biquadFilter_t SerialFilterLPF[4]; // 4个通道的滤波器
@@ -106,7 +106,7 @@ float TouchY_Pid_outputF = 0;
 float TouchX_Pid_outputF = 0;
 
 float cutoffFreq = 200;
-float enableDFilter = 1;
+float enableDFilter = 1;      
 float LpfOut[6];  //
 
 void CutoffFreq(char *cmd) {
@@ -1003,7 +1003,9 @@ void RXsbus() { //sbus接收处理函数
   static unsigned long now_ms = millis();
 
   sBus.FeedLine();
+  
   if (sBus.toChannels == 1) { //有新的一帧数据可用
+    remoteControlActive = true;  // 遥控器控制激活
     serialControlActive = false;  // 串口控制禁用
     sbus_dt_ms = millis() - now_ms;
     now_ms = millis();
@@ -1011,8 +1013,10 @@ void RXsbus() { //sbus接收处理函数
     sBus.UpdateChannels();
     sBus.toChannels = 0;
 
+
     if(!sBus.Failsafe() == 0x00){
       serialControlActive = true;  // 串口控制激活
+      remoteControlActive = false;  // 遥控器控制激活
       return;  // 如果遥控器进入失控状态，直接返回
     }
 
@@ -1083,7 +1087,6 @@ void RXsbus() { //sbus接收处理函数
     // }
   }
 }
-
 
 
 float ArcToAngle(float arc)  //弧度转角度
@@ -1171,7 +1174,6 @@ int RightInverseKinematics(float x, float y, float p, float *ax) {
 
   return error;
 }
-
 
 
 int LeftInverseKinematics(float x, float y, float p, float *ax) {
@@ -2444,7 +2446,7 @@ void PIDcontroller_posture(float dt) {
   Angle_Pid.iLimit = AnglePid.limit;  //积分限幅
 
 
-  float angleError = roll_ok - (-BodyPitching_f);  //测量值减去目标值
+  float angleError = roll_ok - (-BodyPitching_f);  //测量值减去目标值 此处roll_ok为俯仰角测量值
   float angleOutput = Angle_Pid.compute(angleError, dt);
 
   //转向环
@@ -2529,6 +2531,7 @@ void RemoteControlFiltering(void)  //遥控器滤波
   }
 }
 
+
 void ReadVoltage(void) {
   VoltageADC = analogRead(analogInPin);
   VoltageADCf = biquadFilterApply(&VoltageFilterLPF, VoltageADC);
@@ -2564,7 +2567,6 @@ void Robot_Tumble(void) {
     BodyPitching_f = 0;
   }
 }
-
 
 
 void body_data_init(void)  //
@@ -3098,7 +3100,7 @@ void Wheel_foot_controller(void)  //轮足控制器
 {
   PIDcontroller_posture(time_dt);  //PID控制器
 
-  if (sbus_swc == 1)  //手自横滚
+  if (sbus_swc == 1)  //手动横滚
     bodyRoll = Roll_Pid.output;
 
   if (TargetLegLength == 0)
@@ -3195,7 +3197,7 @@ void servo_task(void)  //舵机任务
 //解释和应用串口数据
 // 2. 修改handleSerialCommands函数
 void handleSerialCommands() {
-  if (!serialControlActive) return;
+  if (remoteControlActive) return;
 
   static String inputString;
   while (Serial.available() > 0) { //以单个字符为单位读取串口数据
@@ -3552,7 +3554,7 @@ void loop() {
     Serial1_Communication_Frequency();//串口1通讯频率
 
     if(SwitchingPattern==1)//4轮模式
-      MotorOperatingMode();//设置电机为速度模式与四轮足功能选择
+      MotorOperatingMode();//设置电机同时为速度模式与四轮足功能时选择
     
     if((MasterSlaveSelection==0)&&(SwitchingPattern==1))//从机 && 4轮模式
       Read_Serial2();

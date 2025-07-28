@@ -45,7 +45,7 @@ typedef struct
   float sigma;
   float Ts;       // 周期
 
-  float xo1;       // x1输出位置
+  float xo1;       // x1输出位置      //仅在Trot步态中用到
   float zo1;        //输出最高位置
 
   float xo2;       // x2输出位置
