@@ -231,10 +231,6 @@ int sbus_swa = 0;
 int sbus_swb = 0;
 int sbus_swc = 0;
 int sbus_swd = 0;
-float sbus_vra = 0;
-float sbus_vrb = 0;
-float sbus_vraf = 0;
-float sbus_vrbf = 0;
 
 #define SBUS_chMax 1792
 #define SBUS_chMin 192
@@ -255,25 +251,19 @@ PIDController AnglePid(11, 200, 0.2, 0, 0.1);          //4 22 0.08   (Kp, Ki, Kd
 PIDController SpeedPid(0.1, 0.1, 0, 0, 50);     //
 PIDController YawPid(11, 33, 0, 0, 0);          //
 PIDController RollPid(0.06, 1.5, 0.003, 0, 2);  //
-PIDController TouchXPid(0.2, 0, 0.04, 0, 0);    //
-PIDController TouchYPid(0.2, 0, 0.08, 0, 0);    //
 
 float control_torque_compensation = 0;  //控制力矩补偿
 
 float PidDt = 0.01;
 
 // 创建MyPIDController实例，设置初始参数
-//avatii无负重
+// avatii无负重
 // MyPIDController Angle_Pid(8, 222, 0.08 , 0.1, 0, PidDt, 0, 0);  //p i d iLimit outputLimit dt EnableDFilter cutoffFreq
 MyPIDController Angle_Pid(0, 0, 0, 0, 0, PidDt, 0, 0);  //p i d iLimit outputLimit dt EnableDFilter cutoffFreq
-
 MyPIDController Speed_Pid(0, 0, 0, 0, 0, PidDt, 0, 0);
 MyPIDController Yaw_Pid(0, 0, 0, 0, 0, PidDt, 0, 0);
 MyPIDController Roll_Pid(0, 0, 0, 0, 0, PidDt, 0, 0);
 MyPIDController Pitching_Pid(0, 0, 0, 0, 0, PidDt, 0, 0);
-
-MyPIDController TouchX_Pid(0, 0, 0, 0, 10, PidDt, 0, 0);
-MyPIDController TouchY_Pid(0, 0, 0, 0, 8, PidDt, 0, 0);
 
 void ControlTorqueCompensation(char *cmd) {
   command.scalar(&control_torque_compensation, cmd);
@@ -401,10 +391,6 @@ void doMotor2(char *cmd) {
   command.motor(&motor2, cmd);
 }
 
-void Send_Serial1(void);
-void Read_Serial1(void);  //读串口1数据;
-void Send_Serial2(void);
-void Read_Serial2(void);  //读串口2数据;
 void RXsbus();
 int RightInverseKinematics(float x, float y, float p, float *ax);
 int LeftInverseKinematics(float x, float y, float p, float *ax);
@@ -412,16 +398,12 @@ void print_data(void);
 void ImuUpdate(void);
 void FlashSave(int sw);
 void FlashInit(void);
-void PIDcontroller_angle(float dt);
 void PIDcontroller_posture(float dt);
-void PIDcontroller_posture_4wheel(float dt);
 void RemoteControlFiltering(void);
 void ReadVoltage(void);
 void PidParameter(void);
 void Robot_Tumble(void);
 void body_data_init(void);
-void TrotGaitAlgorithm(void);  //Trot步态
-void MotorOperatingMode(void);
 void motor_init(void);
 
 void command_init(void);
@@ -699,294 +681,6 @@ void motor_init(void) {
   //motor2.monitor_variables = _MON_TARGET | _MON_VEL | _MON_ANGLE; // monitor target velocity and angle
 }
 
-boolean crc1(unsigned char buffer[]) {
-  unsigned int crc_bit1 = 0;
-  unsigned int sum1 = 0;
-
-  for (int j = 2; j <= 27; j++) {
-    sum1 += buffer[j];
-  }
-  crc_bit1 = sum1 & 0xff;
-  if ((unsigned char)crc_bit1 == buffer[28])
-    return true;
-  else
-    return false;
-}
-
-
-unsigned char crc2(unsigned char buffer[]) {
-  unsigned int crc_bit1 = 0;
-  unsigned int sum1 = 0;
-
-  for (int j = 2; j <= 27; j++) {
-    sum1 += buffer[j];
-  }
-  crc_bit1 = sum1 & 0xff;
-
-  return (unsigned char)crc_bit1;
-}
-
-
-
-void Send_Serial1(void) {
-  //开始标志
-  serial1.txbuf[0] = Serial1_START1;
-  serial1.txbuf[1] = Serial1_START2;
-  //左腿坐标x
-  serial1.txbuf[2] = ((uint8_t *)&body.xo3)[0];  //
-  serial1.txbuf[3] = ((uint8_t *)&body.xo3)[1];
-  serial1.txbuf[4] = ((uint8_t *)&body.xo3)[2];
-  serial1.txbuf[5] = ((uint8_t *)&body.xo3)[3];
-  //左腿坐标z
-  serial1.txbuf[6] = ((uint8_t *)&body.zo3)[0];
-  serial1.txbuf[7] = ((uint8_t *)&body.zo3)[1];
-  serial1.txbuf[8] = ((uint8_t *)&body.zo3)[2];
-  serial1.txbuf[9] = ((uint8_t *)&body.zo3)[3];
-  //右腿坐标x
-  serial1.txbuf[10] = ((uint8_t *)&body.xo4)[0];  //
-  serial1.txbuf[11] = ((uint8_t *)&body.xo4)[1];
-  serial1.txbuf[12] = ((uint8_t *)&body.xo4)[2];
-  serial1.txbuf[13] = ((uint8_t *)&body.xo4)[3];
-  //右腿坐标z
-  serial1.txbuf[14] = ((uint8_t *)&body.zo4)[0];
-  serial1.txbuf[15] = ((uint8_t *)&body.zo4)[1];
-  serial1.txbuf[16] = ((uint8_t *)&body.zo4)[2];
-  serial1.txbuf[17] = ((uint8_t *)&body.zo4)[3];
-  //左腿电机目标值
-  serial1.txbuf[18] = ((uint8_t *)&body.MT[2])[0];
-  serial1.txbuf[19] = ((uint8_t *)&body.MT[2])[1];
-  serial1.txbuf[20] = ((uint8_t *)&body.MT[2])[2];
-  serial1.txbuf[21] = ((uint8_t *)&body.MT[2])[3];
-  //右电机目标值
-  serial1.txbuf[22] = ((uint8_t *)&body.MT[3])[0];
-  serial1.txbuf[23] = ((uint8_t *)&body.MT[3])[1];
-  serial1.txbuf[24] = ((uint8_t *)&body.MT[3])[2];
-  serial1.txbuf[25] = ((uint8_t *)&body.MT[3])[3];
-
-  //电机工作模式
-  serial1.txbuf[26] = body.MotorMode;
-
-  //
-  serial1.txbuf[27] = body.Ts;
-
-  //校验
-  serial1.txbuf[28] = crc2(serial1.txbuf);
-  //结束标志
-  serial1.txbuf[29] = Serial1_END1;
-
-  Serial1.write(serial1.txbuf, sizeof(serial1.txbuf));
-}
-
-
-void Read_Serial1(void)  //读串口1数据
-{
-
-  while (Serial1.available()) {
-    serial1.dat = Serial1.read();
-    //Serial.println(serial1.dat);
-    if ((serial1.count == 0) && (serial1.dat == Serial1_START1)) {
-      serial1.rxbuf[serial1.count] = serial1.dat;
-      serial1.count = 1;
-    } else if ((serial1.count == 1) && (serial1.dat == Serial1_START2)) {
-      serial1.rxbuf[serial1.count] = serial1.dat;
-      serial1.recstatu = 1;
-      serial1.count = 2;
-    } else if (serial1.recstatu == 1)  //头字节正确
-    {
-      serial1.rxbuf[serial1.count] = serial1.dat;
-      serial1.count++;
-      if (serial1.count >= 29) {
-        if (crc1(serial1.rxbuf)) {
-          body.Serial1count++;
-          serial1.recstatu = 0;
-          serial1.packerflag = 1;  //用于告知系统已经接收成功
-          serial1.count = 0;
-          //触摸屏x数据
-          ((uint8_t *)&Touch.XPdatF)[0] = serial1.rxbuf[2];
-          ((uint8_t *)&Touch.XPdatF)[1] = serial1.rxbuf[3];
-          ((uint8_t *)&Touch.XPdatF)[2] = serial1.rxbuf[4];
-          ((uint8_t *)&Touch.XPdatF)[3] = serial1.rxbuf[5];
-          //触摸屏y数据
-          ((uint8_t *)&Touch.YPdatF)[0] = serial1.rxbuf[6];
-          ((uint8_t *)&Touch.YPdatF)[1] = serial1.rxbuf[7];
-          ((uint8_t *)&Touch.YPdatF)[2] = serial1.rxbuf[8];
-          ((uint8_t *)&Touch.YPdatF)[3] = serial1.rxbuf[9];
-          //左电机速度
-          ((uint8_t *)&body.MotorVelocityF[2])[0] = serial1.rxbuf[10];
-          ((uint8_t *)&body.MotorVelocityF[2])[1] = serial1.rxbuf[11];
-          ((uint8_t *)&body.MotorVelocityF[2])[2] = serial1.rxbuf[12];
-          ((uint8_t *)&body.MotorVelocityF[2])[3] = serial1.rxbuf[13];
-          //右电机速度
-          ((uint8_t *)&body.MotorVelocityF[3])[0] = serial1.rxbuf[14];
-          ((uint8_t *)&body.MotorVelocityF[3])[1] = serial1.rxbuf[15];
-          ((uint8_t *)&body.MotorVelocityF[3])[2] = serial1.rxbuf[16];
-          ((uint8_t *)&body.MotorVelocityF[3])[3] = serial1.rxbuf[17];
-
-          Touch.state = serial1.rxbuf[27];
-
-        } else {
-          serial1.rxbuf[0] = 0;
-          serial1.rxbuf[1] = 0;
-          serial1.recstatu = 0;
-          serial1.packerflag = 0;  //接收失败
-          serial1.count = 0;
-          //Serial.println("on2..............................");
-        }
-      }
-    } else {
-      serial1.rxbuf[0] = 0;
-      serial1.rxbuf[1] = 0;
-      serial1.recstatu = 0;
-      serial1.packerflag = 0;  //用于告知系统已经接收失败
-      serial1.count = 0;
-      serial1.dat = 0;
-      //Serial.println("on1..............................");
-    }
-  }
-}
-
-
-
-void Send_Serial2(void) {
-  //开始标志
-  serial2.txbuf[0] = Serial1_START1;
-  serial2.txbuf[1] = Serial1_START2;
-
-  //触摸屏x位置
-  serial2.txbuf[2] = ((uint8_t *)&Touch.XPdatF)[0];  //
-  serial2.txbuf[3] = ((uint8_t *)&Touch.XPdatF)[1];
-  serial2.txbuf[4] = ((uint8_t *)&Touch.XPdatF)[2];
-  serial2.txbuf[5] = ((uint8_t *)&Touch.XPdatF)[3];
-  //触摸屏y位置
-  serial2.txbuf[6] = ((uint8_t *)&Touch.YPdatF)[0];
-  serial2.txbuf[7] = ((uint8_t *)&Touch.YPdatF)[1];
-  serial2.txbuf[8] = ((uint8_t *)&Touch.YPdatF)[2];
-  serial2.txbuf[9] = ((uint8_t *)&Touch.YPdatF)[3];
-  //左电机速度
-  serial2.txbuf[10] = ((uint8_t *)&Motor1_Velocity_f)[0];  //
-  serial2.txbuf[11] = ((uint8_t *)&Motor1_Velocity_f)[1];
-  serial2.txbuf[12] = ((uint8_t *)&Motor1_Velocity_f)[2];
-  serial2.txbuf[13] = ((uint8_t *)&Motor1_Velocity_f)[3];
-  //右电机速度
-  serial2.txbuf[14] = ((uint8_t *)&Motor2_Velocity_f)[0];
-  serial2.txbuf[15] = ((uint8_t *)&Motor2_Velocity_f)[1];
-  serial2.txbuf[16] = ((uint8_t *)&Motor2_Velocity_f)[2];
-  serial2.txbuf[17] = ((uint8_t *)&Motor2_Velocity_f)[3];
-  //左腿电机目标值
-  serial2.txbuf[18] = 0;  //((uint8_t *)&body.MT[2])[0];
-  serial2.txbuf[19] = 0;  //((uint8_t *)&body.MT[2])[1];
-  serial2.txbuf[20] = 0;  //((uint8_t *)&body.MT[2])[2];
-  serial2.txbuf[21] = 0;  //((uint8_t *)&body.MT[2])[3];
-  //右电机目标值
-  serial2.txbuf[22] = 0;  //((uint8_t *)&body.MT[3])[0];
-  serial2.txbuf[23] = 0;  //((uint8_t *)&body.MT[3])[1];
-  serial2.txbuf[24] = 0;  //((uint8_t *)&body.MT[3])[2];
-  serial2.txbuf[25] = 0;  //((uint8_t *)&body.MT[3])[3];
-
-  //电机工作模式
-  serial2.txbuf[26] = 0;  //body.MotorMode;
-
-  //
-  serial2.txbuf[27] = Touch.state;  //body.Ts;
-
-  //校验
-  serial2.txbuf[28] = crc2(serial2.txbuf);
-  //结束标志
-  serial2.txbuf[29] = Serial1_END1;
-
-  Serial2.write(serial2.txbuf, sizeof(serial2.txbuf));
-}
-
-
-void Read_Serial2(void)  //读串口2数据
-{
-
-  while (Serial2.available()) {
-    serial2.dat = Serial2.read();
-    //Serial.println(serial2.dat);
-    if ((serial2.count == 0) && (serial2.dat == Serial1_START1)) {
-      serial2.rxbuf[serial2.count] = serial2.dat;
-      serial2.count = 1;
-    } else if ((serial2.count == 1) && (serial2.dat == Serial1_START2)) {
-      serial2.rxbuf[serial2.count] = serial2.dat;
-      serial2.recstatu = 1;
-      serial2.count = 2;
-    } else if (serial2.recstatu == 1)  //头字节正确
-    {
-      serial2.rxbuf[serial2.count] = serial2.dat;
-      serial2.count++;
-      if (serial2.count >= 29) {
-        if (crc1(serial2.rxbuf)) {
-          body.Serial1count++;
-          serial2.recstatu = 0;
-          serial2.packerflag = 1;  //用于告知系统已经接收成功
-          serial2.count = 0;
-          //左腿坐标x
-          ((uint8_t *)&body.xo3)[0] = serial2.rxbuf[2];
-          ((uint8_t *)&body.xo3)[1] = serial2.rxbuf[3];
-          ((uint8_t *)&body.xo3)[2] = serial2.rxbuf[4];
-          ((uint8_t *)&body.xo3)[3] = serial2.rxbuf[5];
-          //左腿坐标z
-          ((uint8_t *)&body.zo3)[0] = serial2.rxbuf[6];
-          ((uint8_t *)&body.zo3)[1] = serial2.rxbuf[7];
-          ((uint8_t *)&body.zo3)[2] = serial2.rxbuf[8];
-          ((uint8_t *)&body.zo3)[3] = serial2.rxbuf[9];
-          //右腿坐标x
-          ((uint8_t *)&body.xo4)[0] = serial2.rxbuf[10];
-          ((uint8_t *)&body.xo4)[1] = serial2.rxbuf[11];
-          ((uint8_t *)&body.xo4)[2] = serial2.rxbuf[12];
-          ((uint8_t *)&body.xo4)[3] = serial2.rxbuf[13];
-          //右腿坐标z
-          ((uint8_t *)&body.zo4)[0] = serial2.rxbuf[14];
-          ((uint8_t *)&body.zo4)[1] = serial2.rxbuf[15];
-          ((uint8_t *)&body.zo4)[2] = serial2.rxbuf[16];
-          ((uint8_t *)&body.zo4)[3] = serial2.rxbuf[17];
-          //左腿电机目标值
-          ((uint8_t *)&body.MT[2])[0] = serial2.rxbuf[18];
-          ((uint8_t *)&body.MT[2])[1] = serial2.rxbuf[19];
-          ((uint8_t *)&body.MT[2])[2] = serial2.rxbuf[20];
-          ((uint8_t *)&body.MT[2])[3] = serial2.rxbuf[21];
-          //右电机目标值
-          ((uint8_t *)&body.MT[3])[0] = serial2.rxbuf[22];
-          ((uint8_t *)&body.MT[3])[1] = serial2.rxbuf[23];
-          ((uint8_t *)&body.MT[3])[2] = serial2.rxbuf[24];
-          ((uint8_t *)&body.MT[3])[3] = serial2.rxbuf[25];
-          //电机工作模式
-          body.MotorMode = serial2.rxbuf[26];
-
-
-          //body.Ts = serial2.rxbuf[27];
-
-
-          /*
-                          Serial.println("\t");
-                          Serial.print("Motor1_Target:");
-                          Serial.print(Motor1_Target);
-                          Serial.print("  Motor2_Target:");
-                          Serial.println(Motor2_Target);
-          */
-          //disconnection = 0;
-        } else {
-          serial2.rxbuf[0] = 0;
-          serial2.rxbuf[1] = 0;
-          serial2.recstatu = 0;
-          serial2.packerflag = 0;  //接收失败
-          serial2.count = 0;
-          //Serial.println("on2..............................");
-        }
-      }
-    } else {
-      serial2.rxbuf[0] = 0;
-      serial2.rxbuf[1] = 0;
-      serial2.recstatu = 0;
-      serial2.packerflag = 0;  //用于告知系统已经接收失败
-      serial2.count = 0;
-      serial2.dat = 0;
-      //Serial.println("on1..............................");
-    }
-  }
-}
-
 //映射
 float mapf(long x, long in_min, long in_max, float out_min, float out_max) {
   long divisor = (in_max - in_min);
@@ -1029,9 +723,6 @@ void RXsbus() { //sbus接收处理函数
     sbuschx[8] = map(sBus.channels[8], SBUS_chMin, SBUS_chMax, 0, 100);
     sbuschx[9] = map(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0, 100);
 
-    //顶球
-    sbus_vra = mapf(sBus.channels[8], SBUS_chMin, SBUS_chMax, -5, 5);  //修改顶球目标位置
-    sbus_vrb = mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, -5, 5);
 
     if (sbus_swd == 0)  //姿态控制1
     {
@@ -1052,39 +743,8 @@ void RXsbus() { //sbus接收处理函数
         LegLength = mapf(sBus.channels[1], SBUS_chMin, 992, 0.05, 0.06);  //双腿高
       else
         LegLength = mapf(sBus.channels[1], 993, SBUS_chMax, 0.06, 0.07);  //双腿高
-
-
-      //BodyRoll =  mapf(sBus.channels[0], SBUS_chMin, SBUS_chMax, -0.011, 0.011); //横滚
-      //BodyPitching = mapf(sBus.channels[1], SBUS_chMin, SBUS_chMax, -22, 22); //俯仰
-      //BodyPitching = mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, -45, 45); //俯仰
     }
-
-    // 打印所有控制参数，包括LegLength和BodyPitching
-    // Serial.print("MS:");
-    // Serial.print(MovementSpeed);
-    // Serial.print("\tBT:");
-    // Serial.print(BodyTurn);
-    // Serial.print("\tSWA:");
-    // Serial.print(sbus_swa);
-    // Serial.print("\tSWB:");
-    // Serial.print(sbus_swb);
-    // Serial.print("\tSWC:");
-    // Serial.print(sbus_swc);
-    // Serial.print("\tSWD:");
-    // Serial.print(sbus_swd);
-    // Serial.print("\tLL:");
-    // Serial.print(LegLength);
-    // Serial.print("\tBP:");
-    // Serial.println(BodyPitching);
-
-
     BodyRoll = mapf(sBus.channels[0], SBUS_chMin, SBUS_chMax, -0.011, 0.011);  //横滚
-
-    // if (Voltage <= 7.4) {
-    //   //sbus_swa = 0;
-    //   Serial.print(" Voltage:");
-    //   Serial.println(Voltage, 5);
-    // }
   }
 }
 
@@ -1135,7 +795,7 @@ int RightInverseKinematics(float x, float y, float p, float *ax) {
 
   pitch = AngleToArc(p);  //俯仰角
 
-  x1 = x * cosf(pitch) - y * sinf(pitch);
+  x1 = x * cosf(pitch) - y * sinf(pitch); //转换至有俯仰角的坐标系内
   y1 = x * sinf(pitch) + y * cosf(pitch);
 
 
@@ -1163,7 +823,7 @@ int RightInverseKinematics(float x, float y, float p, float *ax) {
   aOEC = PI - aOCE - aEOC;
   aDEC = acos((pow(AB, 2) + pow(EC, 2) - pow(BC, 2)) / (2 * AB * EC));
   aDEH = PI - aDEC - aOEC;
-  ax[1] = ArcToAngle(aDEH);  //关节1角度
+  ax[1] = ArcToAngle(aDEH);  //关节2角度
 
 
   if (AC >= (AB + BC))  //超出结构最大范围
@@ -2211,52 +1871,6 @@ float BodyPitchingCorrect(float x)  //俯仰角校正
   return y;
 }
 
-
-void PIDcontroller_angle(float dt) { //该函数没有被调用
-  //速度环
-  Speed_Pid.Kp = SpeedPid.P;
-  Speed_Pid.Ki = SpeedPid.I;
-  Speed_Pid.Kd = SpeedPid.D;
-
-  float speedError = (Motor1_Velocity_f + Motor2_Velocity_f) * 0.5 - MovementSpeed;  //测量值减去目标值
-  float speedOutput = Speed_Pid.compute(speedError, dt);
-
-  //平衡环
-  Angle_Pid.Kp = AnglePid.P;
-  Angle_Pid.Ki = AnglePid.I;
-  Angle_Pid.Kd = AnglePid.D;
-
-  //LpfOut BodyPitching
-  float angleError = roll_ok - speedOutput - (-BodyPitching);  //测量值减去目标值
-  float angleOutput = Angle_Pid.compute(angleError, dt);
-
-  //转向环
-  Yaw_Pid.Kp = YawPid.P;
-  Yaw_Pid.Ki = YawPid.I;
-  Yaw_Pid.Kd = YawPid.D;
-
-  float yawError = attitude.gyro.z - BodyTurn;  //测量值减去目标值
-  float yawOutput = Yaw_Pid.compute(yawError, dt);
-
-  float target1 = angleOutput - yawOutput;
-  float target2 = angleOutput + yawOutput;
-
-  if (control_torque_compensation != 0) {
-    if (target1 > 0)
-      target1 = target1 + control_torque_compensation;
-    else if (target1 < 0)
-      target1 = target1 + (-control_torque_compensation);
-
-    if (target2 > 0)
-      target2 = target2 + control_torque_compensation;
-    else if (target2 < 0)
-      target2 = target2 + (-control_torque_compensation);
-  }
-
-  motor1.target = target1;
-  motor2.target = target2;
-}
-
 /*PIDPID*/
 void PidParameter(void) {
   if (sbus_swa == 1)  //不带触摸屏
@@ -2305,111 +1919,12 @@ void PidParameter(void) {
   YawPid.D = 0;
   YawPid.limit = 0;
   
-  //触摸屏
-  TouchXPid.P = 0.2;
-  TouchXPid.I = 0;
-  TouchXPid.D = 0.04;
-  TouchXPid.limit = 0;  //积分限幅
-
-  TouchYPid.P = 0.2;
-  TouchYPid.I = 0;
-  TouchYPid.D = 0.08;
-  TouchYPid.limit = 0;  //积分限幅
 }
 
 
 void PIDcontroller_posture(float dt) {
   if ((int)PidParameterTuning == 0)
     PidParameter();
-
-  //触摸屏
-  TouchX_Pid.Kp = TouchXPid.P / 100;
-  TouchX_Pid.Ki = TouchXPid.I / 100;
-  TouchX_Pid.Kd = TouchXPid.D / 100;
-  TouchX_Pid.iLimit = TouchXPid.limit;  //积分限幅
-
-  TouchY_Pid.Kp = TouchYPid.P / 100;
-  TouchY_Pid.Ki = TouchYPid.I / 100;
-  TouchY_Pid.Kd = TouchYPid.D / 100;
-  TouchY_Pid.iLimit = TouchYPid.limit;  //积分限幅
-
-  float touchXError = Touch.XPdatF;
-  float touchYError = Touch.YPdatF;
-  static float TouchX_kd = 0;
-  static float TouchY_kd = 0;
-
-  TouchX_Pid.compute(touchXError, dt);
-  TouchY_Pid.compute(touchYError, dt);
-
-  TouchX_Pid.deriv = constrain(TouchX_Pid.deriv, -11000, 11000);
-  TouchX_Pid.outD = TouchX_kd * TouchX_Pid.deriv;
-
-  if ((sbus_swd == 2) || (sbus_swc == 1))  //顶球模式
-  {
-    BodyPitching = TouchX_Pid.outP + TouchX_Pid.outI + TouchX_Pid.outD + sbus_vraf;
-    BodyPitching = -BodyPitching;
-  }
-
-  TouchY_Pid.deriv = constrain(TouchY_Pid.deriv, -11000, 11000);
-  TouchY_Pid.outD = TouchY_kd * TouchY_Pid.deriv;
-  TouchY_Pid.output = TouchY_Pid.outP + TouchY_Pid.outI + TouchY_Pid.outD + sbus_vrbf;
-  if ((int)enableDFilter == 1) {
-    TouchY_Pid_outputF = biquadFilterApply(&FilterLPF[10], TouchY_Pid.output);
-    TouchX_Pid_outputF = biquadFilterApply(&FilterLPF[11], TouchX_Pid.output);
-  } else {
-    TouchY_Pid_outputF = TouchY_Pid.output;
-    TouchX_Pid_outputF = TouchX_Pid.output;
-  }
-
-  if ((Touch.state == 1) && (Touch.P_count < 4)) {
-    Touch.P_count++;
-    TouchX_Pid.integral = 0;
-    //TouchX_Pid.output = 0;
-    //BodyPitching = 0;
-    TouchY_Pid.integral = 0;
-    //TouchY_Pid_outputF = 0;
-  }
-
-  if (Touch.P_count >= 4) {
-    if (TouchX_kd < TouchX_Pid.Kd) {
-      TouchX_kd = TouchX_kd + (TouchX_Pid.Kd / 22);
-    }
-    if (TouchY_kd < TouchY_Pid.Kd) {
-      TouchY_kd = TouchY_kd + (TouchY_Pid.Kd / 22);
-    }
-    Touch.start = 2;
-  }
-
-  if ((Touch.state == 0) && (Touch.L_count < 44))
-    Touch.L_count++;
-  else
-    Touch.L_count = 0;
-
-  if (Touch.L_count >= 44) {
-    TouchX_Pid.integral = 0;
-    //TouchX_Pid.output = 0;
-    //BodyPitching = 0;
-    TouchY_Pid.integral = 0;
-    //TouchY_Pid_outputF = 0;
-    Touch.P_count = 0;
-    TouchX_kd = 0;
-    TouchY_kd = 0;
-    Touch.start = -2;
-  }
-
-  if ((sbus_swd != 2) || (sbus_swc != 1))  //非顶球模式
-  {
-    TouchX_Pid.integral = 0;
-    TouchX_Pid.output = 0;
-    //BodyPitching = 0;
-    TouchY_Pid.integral = 0;
-    TouchY_Pid.output = 0;
-    TouchY_Pid_outputF = 0;
-    TouchX_kd = 0;
-    TouchY_kd = 0;
-  }
-
-
 
   //横滚角
   Roll_Pid.Kp = RollPid.P / 100;
@@ -2428,7 +1943,6 @@ void PIDcontroller_posture(float dt) {
     Roll_Pid.output = 0;
     Roll_Pid.integral = 0;
   }
-
 
   //速度环
   Speed_Pid.Kp = SpeedPid.P / 100;
@@ -2488,8 +2002,6 @@ void RemoteControlFiltering(void)  //遥控器滤波
   static int enableDFilter_last = (int)enableDFilter;
   static int cutoffFreq_last = (int)cutoffFreq;
 
-  sbus_vraf = biquadFilterApply(&FilterLPF[8], sbus_vra);
-  sbus_vrbf = biquadFilterApply(&FilterLPF[9], sbus_vrb);
 
   if ((int)enableDFilter == 1) {
     if (body.MotorMode >= 3)
@@ -2497,7 +2009,7 @@ void RemoteControlFiltering(void)  //遥控器滤波
     else
       BodyPitching_f = biquadFilterApply(&FilterLPF[0], BodyPitching);  //
 
-    body.BodyPitching4WheelTF = biquadFilterApply(&FilterLPF[12], body.BodyPitching4WheelT);
+    
     BodyRoll_f = biquadFilterApply(&FilterLPF[1], BodyRoll);
     LegLength_f = biquadFilterApply(&FilterLPF[2], LegLength);
     SlideStep_f = biquadFilterApply(&FilterLPF[3], SlideStep);
@@ -2569,7 +2081,7 @@ void Robot_Tumble(void) {
 }
 
 
-void body_data_init(void)  //
+void body_data_init(void)  
 {
   // 步态参数
   body.delayTime = 0.005;  // 每一步的延迟时间
@@ -2598,385 +2110,6 @@ void body_data_init(void)  //
 }
 
 
-void TrotGaitAlgorithm(void)  //Trot步态
-{
-  body.CurrentSteps = body.CurrentSteps + body.delayTime;  //步态时间
-  if (body.CurrentSteps > body.Ts) {
-    body.CurrentSteps = 0;
-  }
-
-  if ((body.CurrentSteps >= 0) && (body.CurrentSteps < (body.lambda[0] * body.Ts)))  //第一阶段
-  {
-
-    body.sigma = 2 * PI * body.CurrentSteps / (body.lambda[0] * body.Ts);  //第一阶段时间转成360度
-
-    body.xo1 = (body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (-body.xt / 2);  // 摆线轨迹计算
-    body.zo1 = body.h * (1 - cos(body.sigma)) + body.zs;
-
-    body.xo2 = (body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (-body.xt / 2);  // 摆线轨迹计算
-    body.zo2 = 0;
-
-    body.xo3 = (body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (-body.xt / 2);  // 摆线轨迹计算
-    body.zo3 = 0;
-
-    body.xo4 = (body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (-body.xt / 2);  // 摆线轨迹计算
-    body.zo4 = body.h * (1 - cos(body.sigma)) + body.zs;
-
-  } else if ((body.CurrentSteps >= (body.lambda[0] * body.Ts)) && (body.CurrentSteps < (body.lambda[1] * body.Ts)))  //第二阶段
-  {
-    body.sigma = 2 * PI * (body.CurrentSteps - (body.lambda[0] * body.Ts)) / ((body.lambda[1] - body.lambda[0]) * body.Ts);  //第二阶段时间转成360度
-
-    body.xo1 = (-body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (body.xt / 2);  // 摆线轨迹计算
-    body.zo1 = 0;
-
-    body.xo2 = (-body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (body.xt / 2);  // 摆线轨迹计算
-    body.zo2 = body.h * (1 - cos(body.sigma)) + body.zs;
-
-    body.xo3 = (-body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (body.xt / 2);  // 摆线轨迹计算
-    body.zo3 = body.h * (1 - cos(body.sigma)) + body.zs;
-
-    body.xo4 = (-body.xt) * (body.sigma - sin(body.sigma)) / (2 * PI) + (body.xt / 2);  // 摆线轨迹计算
-    body.zo4 = 0;
-  }
-
-  if (body.MotorMode < 2) {
-    if (body.xt < 0) {
-      body.zo1 = body.zo1 - 0.01;
-      body.zo2 = body.zo2 - 0.01;
-    }
-    if (body.xt > 0) {
-      body.zo3 = body.zo3 - 0.01;
-      body.zo4 = body.zo4 - 0.01;
-    }
-  } else if (body.MotorMode >= 2) {
-    body.zo1 = body.zo1 + LegLength - body.BodyRoll4Wheel + body.BodyPitching4Wheel - Roll_Pid.output - TouchX_Pid_outputF + TouchY_Pid_outputF;
-    body.zo2 = body.zo2 + LegLength + body.BodyRoll4Wheel + body.BodyPitching4Wheel + Roll_Pid.output + TouchX_Pid_outputF + TouchY_Pid_outputF;
-    body.zo3 = body.zo3 + LegLength - body.BodyRoll4Wheel - body.BodyPitching4Wheel - Roll_Pid.output - TouchX_Pid_outputF - TouchY_Pid_outputF;
-    body.zo4 = body.zo4 + LegLength + body.BodyRoll4Wheel - body.BodyPitching4Wheel + Roll_Pid.output + TouchX_Pid_outputF - TouchY_Pid_outputF;
-  }
-
-  if ((int)Select == 46) {
-    Serial.print(" XT:");
-    Serial.print(body.xt * 100, 4);
-
-    Serial.print(" xo1:");
-    Serial.print(body.xo1 * 100, 4);
-
-    Serial.print(" zo1:");
-    Serial.print(body.zo1 * 100, 4);
-
-    Serial.print(" xo2:");
-    Serial.print(body.xo2 * 100, 4);
-
-    Serial.print(" zo2:");
-    Serial.print(body.zo2 * 100, 4);
-
-    Serial.print(" sigma:");
-    Serial.println(body.sigma, 4);
-  }
-}
-
-
-void MotorOperatingMode(void)  //设置电机为速度模式与四轮足功能选择
-{
-  if (motor1.controller != MotionControlType::velocity) {
-    motor1.controller = MotionControlType::velocity;
-    motor2.controller = MotionControlType::velocity;
-  }
-
-  if (MasterSlaveSelection == 1)  //主机
-  {
-    if (sbus_swc == 0) {
-      if ((sbus_swd == 0) && (SwitchingPattern == 1))  //四轮模式
-      {
-        body.MotorMode = 0;
-        body.BodyPitching4Wheel = 0;
-        body.xt = mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -0.04, 0.04);  //步长
-        body.h = 0.025;                                                         //mapf(sBus.channels[8], SBUS_chMin, SBUS_chMax, 0.005, 0.02);//步高 VRA
-        //body.Ts =  mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0.5, 1);//踏步周期S VRB
-
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -55, 55);
-
-        body.MT[0] = -BodyTurn;
-        body.MT[1] = BodyTurn;
-        body.MT[2] = -BodyTurn;
-        body.MT[3] = BodyTurn;
-
-      } else if ((sbus_swd == 1) && (SwitchingPattern == 1)) {
-        body.MotorMode = 1;
-
-        body.BodyPitching4Wheel = 0;
-        body.xt = mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -0.04, 0.04);  //步长
-        MovementSpeed = -mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -33, 33);
-
-        body.h = 0.025;  //mapf(sBus.channels[8], SBUS_chMin, SBUS_chMax, 0.005, 0.025);//步高 VRA
-        //body.Ts =  mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0.5, 1);//踏步周期S VRB
-
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -55, 55);
-        body.MT[0] = -BodyTurn + MovementSpeed;
-        body.MT[1] = BodyTurn + MovementSpeed;
-        body.MT[2] = -BodyTurn + MovementSpeed;
-        body.MT[3] = BodyTurn + MovementSpeed;
-
-      } else if ((sbus_swd == 2) && (SwitchingPattern == 1)) {
-        body.MotorMode = 2;
-
-        ///body.H_R
-        body.xt = 0;  //步长
-        MovementSpeed = -mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -111, 111);
-        body.h = 0;  //步高
-        //body.Ts =  mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0.5, 1);//踏步周期S VRB
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -111, 111);
-
-        LegLength = mapf(sBus.channels[1], SBUS_chMin, SBUS_chMax, 0.03, -0.03);              //双腿高
-        body.BodyRoll4Wheel = mapf(sBus.channels[0], SBUS_chMin, SBUS_chMax, -0.011, 0.011);  //横滚
-
-
-        body.MT[0] = -BodyTurn + MovementSpeed;
-        body.MT[1] = BodyTurn + MovementSpeed;
-        body.MT[2] = -BodyTurn + MovementSpeed;
-        body.MT[3] = BodyTurn + MovementSpeed;
-      }
-    } else if (sbus_swc == 1) {
-      if ((sbus_swd == 0) && (SwitchingPattern == 1)) {
-        body.MotorMode = 3;
-
-        ///body.H_R
-        body.xt = 0;  //步长
-        MovementSpeed = -mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -111, 111);
-        body.h = 0;  //步高
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -111, 111);
-
-        LegLength = 0;  //双腿高
-
-        body.MT[0] = -BodyTurn + MovementSpeed;
-        body.MT[1] = BodyTurn + MovementSpeed;
-        body.MT[2] = -BodyTurn + MovementSpeed;
-        body.MT[3] = BodyTurn + MovementSpeed;
-
-        body.BodyPitching4Wheel = body.BodyPitching4WheelT;
-        body.BodyRoll4Wheel = mapf(sBus.channels[0], SBUS_chMin, SBUS_chMax, -0.011, 0.011);  //横滚
-
-
-
-      } else if ((sbus_swd == 1) && (SwitchingPattern == 1)) {
-        body.MotorMode = 4;
-        ///body.H_R
-        body.xt = 0;  //步长
-        body.h = 0;   //步高
-        MovementSpeed = -mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -111, 111);
-
-        //body.Ts =  mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0.5, 1);//踏步周期S VRB
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -111, 111);
-        //
-        LegLength = 0;            //双腿高
-        body.BodyRoll4Wheel = 0;  //横滚
-
-        body.MT[0] = -BodyTurn + MovementSpeed;
-        body.MT[1] = BodyTurn + MovementSpeed;
-        body.MT[2] = -BodyTurn + MovementSpeed;
-        body.MT[3] = BodyTurn + MovementSpeed;
-
-
-      } else if ((sbus_swd == 2) && (SwitchingPattern == 1)) {
-        body.MotorMode = 5;
-        ///body.H_R
-        body.xt = 0;  //步长
-        body.h = 0;   //步高
-        MovementSpeed = -mapf(sBus.channels[2], SBUS_chMin, SBUS_chMax, -33, 33);
-
-        //body.Ts =  mapf(sBus.channels[9], SBUS_chMin, SBUS_chMax, 0.5, 1);//踏步周期S VRB
-        BodyTurn = mapf(sBus.channels[3], SBUS_chMin, SBUS_chMax, -55, 55);
-        //body.BodyPitching4Wheel = body.BodyPitching4WheelT;
-        LegLength = 0;            //双腿高
-        body.BodyRoll4Wheel = 0;  //横滚
-
-        body.MT[0] = -BodyTurn + MovementSpeed;
-        body.MT[1] = BodyTurn + MovementSpeed;
-        body.MT[2] = -BodyTurn + MovementSpeed;
-        body.MT[3] = BodyTurn + MovementSpeed;
-      }
-    }
-  } else if (MasterSlaveSelection == 0)  //从机
-  {
-    if (body.MotorMode == 0) {
-
-    } else if (body.MotorMode == 1) {
-
-    } else if (body.MotorMode == 2) {
-    }
-  }
-}
-
-
-void PidParameter4wheel(void) {
-
-  //横滚角
-  RollPid.P = 0.04;
-  RollPid.I = 0.5;
-  RollPid.D = 0.003;
-  RollPid.limit = 4.4;  //积分限幅
-
-  //俯仰角角
-  AnglePid.P = 0.08;
-  AnglePid.I = 1;
-  AnglePid.D = 0.005;
-  AnglePid.limit = 2.2;  //积分限幅
-
-
-  //触摸屏
-  TouchXPid.P = 0.1;
-  TouchXPid.I = 0;
-  TouchXPid.D = 0.1;
-  TouchXPid.limit = 0;  //积分限幅
-
-  TouchYPid.P = 0.15;
-  TouchYPid.I = 0;
-  TouchYPid.D = 0.11;
-  TouchYPid.limit = 0;  //积分限幅
-}
-
-
-void PIDcontroller_posture_4wheel(float dt) {
-  if ((int)PidParameterTuning == 0)
-    PidParameter4wheel();
-
-  //触摸屏
-  TouchX_Pid.Kp = TouchXPid.P / 1000;
-  TouchX_Pid.Ki = TouchXPid.I / 1000;
-  TouchX_Pid.Kd = TouchXPid.D / 1000;
-  TouchX_Pid.iLimit = TouchXPid.limit;  //积分限幅
-
-  TouchY_Pid.Kp = TouchYPid.P / 1000;
-  TouchY_Pid.Ki = TouchYPid.I / 1000;
-  TouchY_Pid.Kd = TouchYPid.D / 1000;
-  TouchY_Pid.iLimit = TouchYPid.limit;  //积分限幅
-
-  float touchXError = Touch.XPdatF / 100;
-  float touchYError = Touch.YPdatF / 100;
-  static float TouchX_kd = 0;
-  static float TouchY_kd = 0;
-
-  TouchX_Pid.compute(touchXError, dt);
-  TouchY_Pid.compute(touchYError, dt);
-
-  TouchX_Pid.deriv = constrain(TouchX_Pid.deriv, -77, 77);
-  TouchX_Pid.outD = TouchX_kd * TouchX_Pid.deriv;
-
-  TouchY_Pid.deriv = constrain(TouchY_Pid.deriv, -77, 77);
-  TouchY_Pid.outD = TouchY_kd * TouchY_Pid.deriv;
-
-  if ((sbus_swd == 2) && (sbus_swc == 1) && (sbus_swa >= 1))  //顶球模式
-  {
-    TouchX_Pid.output = TouchX_Pid.outP + TouchX_Pid.outI + TouchX_Pid.outD + sbus_vraf * 0.002;
-
-    TouchY_Pid.output = TouchY_Pid.outP + TouchY_Pid.outI + TouchY_Pid.outD + sbus_vrbf * 0.002;
-
-    TouchX_Pid.output = -TouchX_Pid.output;
-    TouchY_Pid.output = -TouchY_Pid.output;
-  } else {
-    TouchY_Pid_outputF = 0;
-    TouchX_Pid_outputF = 0;
-    TouchY_Pid.output = 0;
-    TouchX_Pid.output = 0;
-  }
-
-  if ((int)enableDFilter == 1) {
-    //TouchY_Pid_outputF = biquadFilterApply(&FilterLPF[10], TouchY_Pid.output);
-    //TouchX_Pid_outputF = biquadFilterApply(&FilterLPF[11], TouchX_Pid.output);
-    TouchY_Pid_outputF = TouchY_Pid.output;
-    TouchX_Pid_outputF = TouchX_Pid.output;
-
-  } else {
-    TouchY_Pid_outputF = TouchY_Pid.output;
-    TouchX_Pid_outputF = TouchX_Pid.output;
-  }
-
-  if ((Touch.state == 1) && (Touch.P_count < 4)) {
-    Touch.P_count++;
-    TouchX_Pid.integral = 0;
-    //TouchX_Pid.output = 0;
-    //TouchX_Pid.output = 0;
-    TouchY_Pid.integral = 0;
-    //TouchY_Pid_outputF = 0;
-  }
-
-  if (Touch.P_count >= 4) {
-    if (TouchX_kd < TouchX_Pid.Kd) {
-      TouchX_kd = TouchX_kd + (TouchX_Pid.Kd / 22);
-    }
-    if (TouchY_kd < TouchY_Pid.Kd) {
-      TouchY_kd = TouchY_kd + (TouchY_Pid.Kd / 22);
-    }
-    Touch.start = 2;
-  }
-
-  if ((Touch.state == 0) && (Touch.L_count < 44))
-    Touch.L_count++;
-  else
-    Touch.L_count = 0;
-
-  if (Touch.L_count >= 44) {
-    TouchX_Pid.integral = 0;
-    //TouchX_Pid.output = 0;
-    //TouchX_Pid.output = 0;
-    TouchY_Pid.integral = 0;
-    //TouchY_Pid_outputF = 0;
-    Touch.P_count = 0;
-    TouchX_kd = 0;
-    TouchY_kd = 0;
-    Touch.start = -2;
-  }
-
-  if ((sbus_swd != 2) || (sbus_swc != 1) || (body.MotorMode != 5))  //非顶球模式
-  {
-    TouchX_Pid.integral = 0;
-    TouchX_Pid.output = 0;
-    //TouchX_Pid.output = 0;
-    TouchY_Pid.integral = 0;
-    TouchY_Pid.output = 0;
-    TouchY_Pid_outputF = 0;
-    TouchX_kd = 0;
-    TouchY_kd = 0;
-  }
-
-  //横滚角 俯仰角
-  Roll_Pid.Kp = RollPid.P / 100;
-  Roll_Pid.Ki = RollPid.I / 100;
-  Roll_Pid.Kd = RollPid.D / 100;
-  Roll_Pid.iLimit = RollPid.limit;  //积分限幅
-
-  Pitching_Pid.Kp = AnglePid.P / 100;
-  Pitching_Pid.Ki = AnglePid.I / 100;
-  Pitching_Pid.Kd = AnglePid.D / 100;
-  Pitching_Pid.iLimit = AnglePid.limit;  //积分限幅
-
-  float TargetBodyRoll = BodyRoll_f * 1222;                    //横滚
-  float TargetBodyPitching = body.BodyPitching4WheelTF * 666;  //横滚
-  if (body.MotorMode == 5)                                     //顶球禁止手动横滚
-  {
-    TargetBodyRoll = 0;
-    TargetBodyPitching = 0;
-  }
-
-
-  float RollError = (-pitch_ok) - (-TargetBodyRoll);        // - (-TouchX_Pid_outputF);
-  float PitchingError = (-roll_ok) - (TargetBodyPitching);  // - (TouchY_Pid_outputF);
-
-  if ((sbus_swc == 1) && (sbus_swa >= 1) && (body.MotorMode == 4))  //横滚角 俯仰角 调平
-  {
-    Roll_Pid.compute(RollError, dt);
-    body.BodyPitching4Wheel = -Pitching_Pid.compute(PitchingError, dt);
-  } else {
-    Roll_Pid.output = 0;
-    Roll_Pid.integral = 0;
-
-    Pitching_Pid.output = 0;
-    Pitching_Pid.integral = 0;
-  }
-}
-
-
 void motor_task(void) {
   if (Communication_object == 1) {
     motor1.monitor();  //使用simpleFOC Studio上位机设置的时候，这句一定要打开。但是会影响程序执行速度
@@ -2990,17 +2123,6 @@ void motor_task(void) {
   // iterative setting FOC phase voltage
   motor1.loopFOC();
   motor2.loopFOC();
-}
-
-
-void Serial1_Communication_Frequency(void) {
-  static int Serial1_count = 0;
-  Serial1_count++;
-  if (Serial1_count >= 5) {
-    Serial1_count = 0;
-    body.Serial1HZ = body.Serial1count * 40;
-    body.Serial1count = 0;
-  }
 }
 
 
@@ -3083,16 +2205,6 @@ void Robot_Stop(void) {
   Speed_Pid.integral = 0;
   Yaw_Pid.integral = 0;
 
-  body.zo1 = 0;
-  body.zo2 = 0;
-  body.zo3 = 0;
-  body.zo4 = 0;
-
-  body.xo1 = 0;
-  body.xo2 = 0;
-  body.xo3 = 0;
-  body.xo4 = 0;
-
   body_data_init();
 }
 
@@ -3109,71 +2221,16 @@ void Wheel_foot_controller(void)  //轮足控制器
     bodyH = TargetLegLength;  //串口设腿长目标值
 }
 
-void Four_wheel_mainframe_task(void)  //主机任务
-{
-  TrotGaitAlgorithm();  //步态
-  PIDcontroller_posture_4wheel(time_dt);
-
-  Send_Serial1();  //发送数据给从机
-  motor1.target = body.MT[0];
-  motor2.target = body.MT[1];
-
-  bodyH = body.H_fron;
-
-  bodyRoll = 0;
-  BodyX = 0;
-  bodyRoll = 0;
-  BodyPitching_f = 0;
-}
-
-
-void Four_wheel_slave_task(void)  //从机任务
-{
-  bodyH = body.H_back;
-
-  bodyRoll = 0;
-  BodyX = 0;
-  bodyRoll = 0;
-  BodyPitching_f = 0;
-
-  Send_Serial2();
-  if (body.Serial1HZ >= 50) {
-
-    body.xo2 = -body.xo4;
-    body.xo1 = -body.xo3;
-    body.zo2 = body.zo4;
-    body.zo1 = body.zo3;
-
-    motor1.target = body.MT[2];
-    motor2.target = body.MT[3];
-
-  } else {
-    bodyH = 0.06;
-    bodyRoll = 0;
-    BodyX = 0;
-    bodyRoll = 0;
-    BodyPitching_f = 0;
-
-    body.xo2 = 0;
-    body.xo1 = 0;
-    body.zo2 = 0;
-    body.zo1 = 0;
-
-    motor1.target = 0;
-    motor2.target = 0;
-  }
-}
-
 void inverse_kinematics_task(void)  //运动学逆解任务
 {
   //打印腿长
   // Serial.print("Target Leg: ");
   // Serial.print(bodyH, 4);
 
-  if (RightInverseKinematics(BarycenterX - BodyX + body.xo2, bodyH - bodyRoll - body.zo2, BodyPitching_f, Rax))
+  if (RightInverseKinematics(BarycenterX - BodyX, bodyH - bodyRoll, BodyPitching_f, Rax))
     Serial.println("RightInverseKinematics no");
 
-  if (LeftInverseKinematics(BarycenterX - BodyX - body.xo1, bodyH + bodyRoll - body.zo1, BodyPitching_f, Lax))
+  if (LeftInverseKinematics(BarycenterX - BodyX, bodyH + bodyRoll, BodyPitching_f, Lax))
     Serial.println("LeftInverseKinematics no");
 }
 
@@ -3290,73 +2347,9 @@ float mapSegmented(float value, float inLow, float inMid, float inHigh, float ou
         return mapf(value, inMid, inHigh, outMid, outHigh);
     }
 }
-// 3. 修改applySerialCommands函数
-/*
-void applySerialCommands() {
-    // 映射但不直接应用
-    //serialRawCache.legLength = mapf(serialCH1, 1250, 1750, 0.05, 0.1);
-    serialRawCache.legLength = mapSegmented(
-        serialCH1, 
-        1000, 1500, 2000,  // 输入范围
-        0.05, 0.06, 0.1    // 输出范围
-    );
-    serialRawCache.bodyRoll = mapf(serialCH2, 1000, 2000, -0.011, 0.011);
-    serialRawCache.movementSpeed = mapf(serialCH3, 1000, 2000, -15, 15);
-    serialRawCache.bodyTurn = -mapf(serialCH4, 1000, 2000, -11, 11);
-    
-    serialRawCache.updated = true;
-    
-    // 设置模式标志
-    sbus_swa = 1;
-    
-    // 重置超时计时器
-    lastSerialTime = millis();
-    serialControlActive = true;
-    remoteControlActive = false;
-    
-    // 调试输出
-    Serial.print("Serial Raw: L=");
-    Serial.print(serialRawCache.legLength, 4);
-    Serial.print(", R=");
-    Serial.print(serialRawCache.bodyRoll, 4);
-    Serial.print(", S=");
-    Serial.print(serialRawCache.movementSpeed, 4);
-    Serial.print(", T=");
-    Serial.println(serialRawCache.bodyTurn, 4);
-}
-*/
-void applySerialCommands() {
-    // 映射串口通道值到控制变量
-    /*
-    serialRawCache.legLength = mapSegmented(
-        serialCH1, 
-        1000, 1500, 2000,  // 输入范围
-        0.05, 0.06, 0.1    // 输出范围
-    );
 
-    float rawLegLength = mapf(serialCH1, 1000, 2000, 0.05, 0.1);
-    float rawBodyRoll = mapf(serialCH2, 1000, 2000, -0.011, 0.011);
-    float rawMovementSpeed = mapf(serialCH3, 1000, 2000, -15, 15);
-    float rawBodyTurn = -mapf(serialCH4, 1000, 2000, -11, 11);
+void applySerialCommands() {
     
-    // 应用低通滤波
-    serialLegLength_f = biquadFilterApply(&SerialFilterLPF[0], rawLegLength);
-    serialBodyRoll_f = biquadFilterApply(&SerialFilterLPF[1], rawBodyRoll);
-    serialMovementSpeed_f = biquadFilterApply(&SerialFilterLPF[2], rawMovementSpeed);
-    serialBodyTurn_f = biquadFilterApply(&SerialFilterLPF[3], rawBodyTurn);
-    
-    // 使用滤波后的值更新控制变量
-    LegLength = serialLegLength_f;
-    BodyRoll = serialBodyRoll_f;
-    MovementSpeed = serialMovementSpeed_f;
-    BodyTurn = serialBodyTurn_f;
-    */
-    //不要上面三段留这段是老版本无滤波的控制
-    // LegLength = mapf(serialCH1, 1250, 1750, 0.05, 0.1);
-    // BodyRoll = mapf(serialCH2, 1250, 1750, -0.011, 0.011);
-    // MovementSpeed = mapf(serialCH3, 1250, 1750, -15, 15);
-    // BodyTurn = -mapf(serialCH4, 1250, 1750, -11, 11);
-
     //这段是重新换了腿长映射之后的控制，没有滤波
     LegLength = mapSegmented(
         serialCH1, 
@@ -3371,18 +2364,7 @@ void applySerialCommands() {
     sbus_swb = 0;
     sbus_swc = 0;
     sbus_swd = 0;
-    
-    // // 调试输出
-    // Serial.print("Filtered Serial: L=");
-    // Serial.print(LegLength);
-    // Serial.print(", R=");
-    // Serial.print(BodyRoll);
-    // Serial.print(", S=");
-    // Serial.print(MovementSpeed);
-    // Serial.print(", T=");
-    // Serial.println(BodyTurn);
 }
-
 
 //实时滤波更新函数
 void updateSerialFilters(float dt) {
@@ -3448,20 +2430,15 @@ void printControlValues() {
 
 void setup() {
 
-  // // 串口滤波处理器
-  // for (int i = 0; i < 4; i++) {
-  //     biquadFilterInitLPF(&SerialFilterLPF[i], 8, 20); // 50Hz截止频率，100Hz采样率
-  // }
-
   if ((MasterSlaveSelection == 0) && (SwitchingPattern == 1))  //从机 && 4轮模式
     Serial2.begin(1000000, SERIAL_8N1, RXD2, TXD2);            //
   else if (MasterSlaveSelection == 1)                          //主机
     Serial1.begin(1000000, SERIAL_8N1, RXD1, TXD1);
 
   Serial.begin(250000);
-  ///////////////////////
+  
   Serial.println("ESP32-S3 Ready");
-  /////////////////////
+  
   FlashInit();  //读取闪存数据
   pinMode(LED_Pin, OUTPUT);
   digitalWrite(LED_Pin, LOW);  //亮
@@ -3508,11 +2485,6 @@ void setup() {
   biquadFilterInitLPF(&FilterLPF[11], 200, (unsigned int)400);        //
   biquadFilterInitLPF(&FilterLPF[12], 50, (unsigned int)cutoffFreq);  //遥控器滤波器
 
-
-  // use monitoring with serial
-  if ((SwitchingPattern == 0) || (MasterSlaveSelection == 0))  //两轮 或者从机模式
-    TouchscreenInit(500);
-
   motor_init();  //FOC电机初始化
 
   command_init();  //调试命令初始化
@@ -3539,30 +2511,11 @@ void loop() {
     applySerialCommands(); // 应用串口控制值
     newSerialData = false; // 清除标志
   }
-  
-  if((SwitchingPattern==0)||(MasterSlaveSelection==0))//两轮 或者从机模式
-    ReadTouchDat();
     
   time_dt = (now_us - now_us1) / 1000000.0f;
   if (time_dt >= 0.005f)  //执行间隔5ms
   {
-    // /****更新串口滤波器****/
-    // if (serialControlActive) {
-    // updateSerialFilters(0.005f);
-    // }
-    // /******************/
-    Serial1_Communication_Frequency();//串口1通讯频率
 
-    if(SwitchingPattern==1)//4轮模式
-      MotorOperatingMode();//设置电机同时为速度模式与四轮足功能时选择
-    
-    if((MasterSlaveSelection==0)&&(SwitchingPattern==1))//从机 && 4轮模式
-      Read_Serial2();
-    else if((MasterSlaveSelection==1)&&(SwitchingPattern==1))//主机 && 4轮模式
-      Read_Serial1();
-
-    if((MasterSlaveSelection==0)||(SwitchingPattern==0))//从机 || 2轮模式
-      TouchBiquadFilter();//触摸屏滤波
       
     RemoteControlFiltering();//遥控信号滤波
     ReadVoltage();//电池
@@ -3596,10 +2549,6 @@ void loop() {
         {
           Wheel_foot_controller();//轮足控制器
         }
-        else if(SwitchingPattern==1)//四轮模式&&主机模式
-        {
-          Four_wheel_mainframe_task();//主机任务
-        }
       }      
     }
     
@@ -3619,18 +2568,6 @@ void loop() {
       // remoteControlActive = true;    // 启用遥控器控制
       // Serial.println("Timeout: Switch back to remote control");
   }
-    
-    // //1s循环打印
-    // if (millis() - lastPrintTime > PRINT_INTERVAL) {
-    //   printControlValues();
-    //   lastPrintTime = millis();
-    // }
     now_us1 = now_us;
   }
-  // if (serialControlActive && (millis() - lastSerialTime > 500)) {
-      
-  //   serialControlActive = false;
-  //   remoteControlActive = true;
-  //   Serial.println("自动切回遥控器控制");
-  // }
 }
