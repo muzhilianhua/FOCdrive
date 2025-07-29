@@ -64,14 +64,6 @@ typedef struct
 
   uint8_t MotorMode;   //电机工作模式
 
-  int Serial1HZ;
-  int Serial1count;
-
-  float BodyRoll4Wheel;
-  float BodyPitching4Wheel;
-  float BodyPitching4WheelT;
-  float BodyPitching4WheelTF;
-      
 } body_t;
 
 
