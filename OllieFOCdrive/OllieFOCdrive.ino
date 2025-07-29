@@ -1603,67 +1603,6 @@ void print_data(void) {
       Serial.println(Yaw_Pid.output, 5);
       break;
 
-    case 34:
-      Serial.print(" Kp:");
-      Serial.print(TouchX_Pid.Kp, 6);
-      Serial.print(" Ki:");
-      Serial.print(TouchX_Pid.Ki, 6);
-      Serial.print(" Kd:");
-      Serial.print(TouchX_Pid.Kd, 6);
-
-      Serial.print(" deriv:");
-      Serial.print(TouchX_Pid.deriv);
-      Serial.print(" out:");
-      Serial.println(TouchX_Pid.output);
-      break;
-
-    case 35:
-      Serial.print(" deriv:");
-      Serial.println(TouchX_Pid.deriv);
-      break;
-
-    case 36:
-      Serial.print(" state:");
-      Serial.print(Touch.state);
-      Serial.print(" start:");
-      Serial.println(Touch.start);
-      break;
-
-    case 38:
-      Serial.print(" X OUT:");
-      Serial.print(BodyPitching);
-      Serial.print(" Y OUT:");
-      Serial.println(TouchY_Pid.output);
-      break;
-
-
-    case 39:
-      Serial.print(" it:");
-      Serial.print(TouchY_Pid.iLimit, 5);
-      Serial.print(" il:");
-      Serial.print(TouchY_Pid.integral, 5);
-      Serial.print(" oI:");
-      Serial.print(TouchY_Pid.outI, 5);
-      Serial.print(" out:");
-      Serial.println(TouchY_Pid.output, 5);
-      break;
-
-
-    case 40:
-
-      if (Touch.state == 1) {
-        Serial.print("  aX:");
-        Serial.print(Touch.XPressDat);
-        Serial.print("  aY:");
-        Serial.println(Touch.YPressDat);
-      } else if (Touch.state == 0) {
-        Serial.print("  tX:");
-        Serial.print(Touch.XPressDat);
-        Serial.print("  tX:");
-        Serial.println(Touch.YPressDat);
-      }
-      break;
-
     case 41:
 
       Serial.print(" roll_ok:");
@@ -1750,15 +1689,6 @@ void print_data(void) {
 
       break;
 
-    case 50:
-
-      Serial.print(" body.Ts:");
-      Serial.print(body.Ts, 4);
-
-      Serial.print(" bodyH:");
-      Serial.println(sbus_vrb, 4);
-
-      break;
 
     case 51:
       Serial.print(" mv1:");
@@ -1957,7 +1887,9 @@ void RemoteControlFiltering(void)  //遥控器滤波
 
 
   if ((int)enableDFilter == 1) {
-    if (body.MotorMode >= 3)
+    if (body.MotorMode >= 3){
+      
+    }
     else
       BodyPitching_f = biquadFilterApply(&FilterLPF[0], BodyPitching);  //
 
